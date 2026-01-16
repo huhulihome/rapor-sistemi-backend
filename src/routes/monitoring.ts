@@ -19,7 +19,7 @@ router.get('/health', async (_req, res) => {
   try {
     const checks = await performHealthChecks();
     const isHealthy = Object.values(checks).every(check => check.status === 'ok');
-    
+
     res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? 'healthy' : 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -57,12 +57,12 @@ router.post('/metrics/clear', clearMetrics);
  * GET /api/monitoring/database
  * Check database health and connection
  */
-router.get('/database', async (req, res) => {
+router.get('/database', async (_req, res) => {
   try {
     const startTime = Date.now();
-    
+
     // Test database connection with a simple query
-    const { data, error } = await supabase
+    const { data: _data, error } = await supabase
       .from('profiles')
       .select('count')
       .limit(1);
@@ -92,7 +92,7 @@ router.get('/database', async (req, res) => {
  * GET /api/monitoring/email
  * Check email service configuration
  */
-router.get('/email', async (req, res) => {
+router.get('/email', async (_req, res) => {
   try {
     const gmailUser = process.env.GMAIL_USER;
     const gmailPassword = process.env.GMAIL_APP_PASSWORD;
@@ -118,10 +118,10 @@ router.get('/email', async (req, res) => {
  * GET /api/monitoring/system
  * Get system information
  */
-router.get('/system', (req, res) => {
+router.get('/system', (_req, res) => {
   const memoryUsage = process.memoryUsage();
   const cpuUsage = process.cpuUsage();
-  
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -160,9 +160,9 @@ async function performHealthChecks() {
       .from('profiles')
       .select('count')
       .limit(1);
-    
+
     const responseTime = Date.now() - startTime;
-    
+
     checks.database = {
       status: error ? 'error' : 'ok',
       responseTime: `${responseTime}ms`,
@@ -178,15 +178,15 @@ async function performHealthChecks() {
   // Email service check
   checks.email = {
     status: process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD ? 'ok' : 'not_configured',
-    message: process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD 
-      ? 'Configured' 
+    message: process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD
+      ? 'Configured'
       : 'Not configured',
   };
 
   // Memory check
   const memoryUsage = process.memoryUsage();
   const heapUsedPercent = (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100;
-  
+
   checks.memory = {
     status: heapUsedPercent > 90 ? 'warning' : 'ok',
     heapUsed: formatBytes(memoryUsage.heapUsed),
@@ -222,11 +222,11 @@ function formatUptime(seconds: number): string {
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
