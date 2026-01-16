@@ -25,7 +25,7 @@ class MetricsCollector {
 
   addMetric(metric: RequestMetrics): void {
     this.metrics.push(metric);
-    
+
     // Keep only the last N metrics
     if (this.metrics.length > this.maxMetrics) {
       this.metrics.shift();
@@ -50,7 +50,7 @@ class MetricsCollector {
     const totalRequests = this.metrics.length;
     const totalResponseTime = this.metrics.reduce((sum, m) => sum + m.responseTime, 0);
     const averageResponseTime = totalResponseTime / totalRequests;
-    
+
     const errorCount = this.metrics.filter(m => m.statusCode >= 400).length;
     const errorRate = (errorCount / totalRequests) * 100;
 
@@ -115,13 +115,28 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     metricsCollector.addMetric(metric);
 
     // Log response
-    const logLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
-    logger[logLevel]('Request completed', {
-      method,
-      path,
-      statusCode,
-      responseTime: `${responseTime}ms`,
-    });
+    if (statusCode >= 500) {
+      logger.error('Request completed', undefined, {
+        method,
+        path,
+        statusCode,
+        responseTime: `${responseTime}ms`,
+      });
+    } else if (statusCode >= 400) {
+      logger.warn('Request completed', {
+        method,
+        path,
+        statusCode,
+        responseTime: `${responseTime}ms`,
+      });
+    } else {
+      logger.info('Request completed', {
+        method,
+        path,
+        statusCode,
+        responseTime: `${responseTime}ms`,
+      });
+    }
 
     // Warn on slow requests
     if (responseTime > 1000) {
@@ -214,10 +229,10 @@ function formatUptime(seconds: number): string {
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
