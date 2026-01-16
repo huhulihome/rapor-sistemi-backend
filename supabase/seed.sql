@@ -1,0 +1,93 @@
+-- Modern Office System - Seed Data
+-- This file contains sample data for development and testing
+-- WARNING: Do not run this in production!
+
+-- =====================================================
+-- SAMPLE PROFILES
+-- =====================================================
+-- Note: In production, profiles are created automatically when users sign up
+-- This is just for testing purposes
+
+-- Sample admin user (you'll need to create this user in Supabase Auth first)
+-- INSERT INTO profiles (id, email, full_name, role, department)
+-- VALUES 
+--   ('admin-uuid-here', 'admin@example.com', 'Admin User', 'admin', 'Management');
+
+-- Sample employee users
+-- INSERT INTO profiles (id, email, full_name, role, department)
+-- VALUES 
+--   ('employee1-uuid', 'john@example.com', 'John Doe', 'employee', 'IT'),
+--   ('employee2-uuid', 'jane@example.com', 'Jane Smith', 'employee', 'HR'),
+--   ('employee3-uuid', 'bob@example.com', 'Bob Johnson', 'employee', 'Operations');
+
+-- =====================================================
+-- SAMPLE TASKS
+-- =====================================================
+-- Uncomment and update UUIDs after creating users
+
+-- INSERT INTO tasks (title, description, category, priority, status, assigned_to, created_by, due_date, estimated_hours)
+-- VALUES 
+--   (
+--     'Setup Development Environment',
+--     'Install and configure all necessary development tools',
+--     'project',
+--     'high',
+--     'in_progress',
+--     'employee1-uuid',
+--     'admin-uuid-here',
+--     NOW() + INTERVAL '7 days',
+--     8
+--   ),
+--   (
+--     'Weekly Team Meeting',
+--     'Attend weekly team sync meeting',
+--     'routine',
+--     'medium',
+--     'not_started',
+--     'employee2-uuid',
+--     'admin-uuid-here',
+--     NOW() + INTERVAL '2 days',
+--     1
+--   ),
+--   (
+--     'Update Documentation',
+--     'Update project documentation with latest changes',
+--     'one_time',
+--     'low',
+--     'not_started',
+--     'employee3-uuid',
+--     'admin-uuid-here',
+--     NOW() + INTERVAL '14 days',
+--     4
+--   );
+
+-- =====================================================
+-- SAMPLE ISSUES
+-- =====================================================
+-- Uncomment and update UUIDs after creating users
+
+-- INSERT INTO issues (title, description, priority, reported_by, suggested_assignee_id)
+-- VALUES 
+--   (
+--     'Network Connectivity Problem',
+--     'Unable to access shared network drive from workstation',
+--     'high',
+--     'employee2-uuid',
+--     'employee1-uuid'
+--   ),
+--   (
+--     'Printer Not Working',
+--     'Office printer is showing error message and not printing',
+--     'medium',
+--     'employee3-uuid',
+--     'employee1-uuid'
+--   );
+
+-- =====================================================
+-- NOTES
+-- =====================================================
+-- To use this seed data:
+-- 1. Create users in Supabase Auth dashboard
+-- 2. Copy their UUIDs
+-- 3. Replace the placeholder UUIDs in this file
+-- 4. Run this SQL in Supabase SQL Editor
