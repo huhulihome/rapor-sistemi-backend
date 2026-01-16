@@ -30,6 +30,7 @@ export const authenticateUser = async (
     const { data, error } = await supabase.auth.getUser(token);
 
     if (error || !data.user) {
+      console.error('Auth error:', error?.message || 'No user data', 'Token prefix:', token.substring(0, 20) + '...');
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid token',
