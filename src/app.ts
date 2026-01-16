@@ -12,6 +12,7 @@ import issueRoutes from './routes/issues.js';
 import notificationRoutes from './routes/notifications.js';
 import analyticsRoutes from './routes/analytics.js';
 import monitoringRoutes from './routes/monitoring.js';
+import usersRoutes from './routes/users.js';
 
 const app = express();
 
@@ -61,10 +62,10 @@ app.use(compression({
 app.use(cors({
   origin: (origin, callback) => {
     const allowedOrigins = config.cors.origin;
-    
+
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -105,6 +106,7 @@ app.use('/api/issues', issueRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/users', usersRoutes);
 
 // Error tracking middleware
 app.use(errorTracker);
