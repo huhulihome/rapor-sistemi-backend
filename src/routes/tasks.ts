@@ -152,15 +152,25 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Only insert fields that exist in the tasks table
+    const insertData = {
+      title: taskData.title,
+      description: taskData.description || null,
+      category: taskData.category,
+      priority: taskData.priority,
+      assigned_to: taskData.assigned_to || null,
+      due_date: taskData.due_date || null,
+      estimated_hours: taskData.estimated_hours || null,
+      tags: taskData.tags || [],
+      created_by: req.user?.id,
+      status: 'not_started',
+      progress_percentage: 0,
+    };
+
     const { data, error } = await supabase
       .from('tasks')
-      .insert({
-        ...taskData,
-        created_by: req.user?.id,
-        status: 'not_started',
-        progress_percentage: 0,
-      })
-      .select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(id, full_name, email), created_by_profile:profiles!tasks_created_by_fkey(id, full_name, email)')
+      .insert(insertData)
+      .select('*')
       .single();
 
     if (error) {
@@ -172,22 +182,31 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     // Send email notification if task is assigned to someone
-    if (data.assigned_to && data.assigned_to_profile) {
-      const emailHtml = emailTemplates.taskAssignment({
-        recipientName: data.assigned_to_profile.full_name,
-        taskTitle: data.title,
-        taskDescription: data.description || '',
-        priority: data.priority,
-        category: data.category,
-        dueDate: data.due_date,
-        taskId: data.id,
-      });
+    if (data.assigned_to) {
+      // Fetch assignee profile separately
+      const { data: assigneeProfile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', data.assigned_to)
+        .single();
 
-      queueEmail(
-        data.assigned_to_profile.email,
-        `📋 Yeni Görev: ${data.title}`,
-        emailHtml
-      );
+      if (assigneeProfile) {
+        const emailHtml = emailTemplates.taskAssignment({
+          recipientName: assigneeProfile.full_name,
+          taskTitle: data.title,
+          taskDescription: data.description || '',
+          priority: data.priority,
+          category: data.category,
+          dueDate: data.due_date,
+          taskId: data.id,
+        });
+
+        queueEmail(
+          assigneeProfile.email,
+          `📋 Yeni Görev: ${data.title}`,
+          emailHtml
+        );
+      }
     }
 
     res.status(201).json({
