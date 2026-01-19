@@ -13,6 +13,7 @@ import notificationRoutes from './routes/notifications.js';
 import analyticsRoutes from './routes/analytics.js';
 import monitoringRoutes from './routes/monitoring.js';
 import usersRoutes from './routes/users.js';
+import deadlinesRoutes from './routes/deadlines.js';
 
 const app = express();
 
@@ -107,6 +108,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/monitoring', monitoringRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/deadlines', deadlinesRoutes);
 
 // Error tracking middleware
 app.use(errorTracker);
