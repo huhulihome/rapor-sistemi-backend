@@ -27,12 +27,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('issues')
-      .select(`
-        *,
-        reported_by_profile:profiles!issues_reported_by_fkey(id, full_name, email, avatar_url),
-        suggested_assignee_profile:profiles!issues_suggested_assignee_id_fkey(id, full_name, email, avatar_url),
-        assigned_to_profile:profiles!issues_assigned_to_fkey(id, full_name, email, avatar_url)
-      `, { count: 'exact' });
+      .select('*', { count: 'exact' });
 
     // Apply filters based on user role
     if (req.user?.role !== 'admin') {
@@ -61,7 +56,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const validSortFields = ['created_at', 'updated_at', 'priority', 'status', 'title'];
     const sortField = validSortFields.includes(sort_by as string) ? sort_by as string : 'created_at';
     const sortDirection = sort_order === 'asc' ? true : false;
-    
+
     query = query.order(sortField, { ascending: sortDirection });
 
     // Apply pagination
@@ -118,10 +113,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     // Check access permissions
-    if (req.user?.role !== 'admin' && 
-        data.reported_by !== req.user?.id && 
-        data.suggested_assignee_id !== req.user?.id &&
-        data.assigned_to !== req.user?.id) {
+    if (req.user?.role !== 'admin' &&
+      data.reported_by !== req.user?.id &&
+      data.suggested_assignee_id !== req.user?.id &&
+      data.assigned_to !== req.user?.id) {
       res.status(403).json({
         error: 'Forbidden',
         message: 'You do not have access to this issue',
@@ -289,7 +284,7 @@ router.put('/:id/assign', requireAdmin, async (req: AuthRequest, res: Response) 
 
     if (assignData.edited_issue) {
       const updatePayload: any = {};
-      
+
       if (assignData.edited_issue.title) {
         updatePayload.title = assignData.edited_issue.title;
         issueTitle = assignData.edited_issue.title;

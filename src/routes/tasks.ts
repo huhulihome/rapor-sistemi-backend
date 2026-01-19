@@ -27,7 +27,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('tasks')
-      .select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(id, full_name, email), created_by_profile:profiles!tasks_created_by_fkey(id, full_name, email)', { count: 'exact' });
+      .select('*', { count: 'exact' });
 
     // Apply filters based on user role
     if (req.user?.role !== 'admin') {
@@ -95,7 +95,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
     let query = supabase
       .from('tasks')
-      .select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(id, full_name, email, avatar_url), created_by_profile:profiles!tasks_created_by_fkey(id, full_name, email)')
+      .select('*')
       .eq('id', id)
       .single();
 
