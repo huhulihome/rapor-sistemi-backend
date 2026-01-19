@@ -167,6 +167,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       progress_percentage: 0,
     };
 
+    console.log('Task insert data:', JSON.stringify(insertData));
+
     const { data, error } = await supabase
       .from('tasks')
       .insert(insertData)
@@ -174,9 +176,11 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       .single();
 
     if (error) {
+      console.error('Task insert error:', JSON.stringify(error));
       res.status(400).json({
         error: 'Database error',
         message: error.message,
+        details: error,
       } as ApiResponse<null>);
       return;
     }
