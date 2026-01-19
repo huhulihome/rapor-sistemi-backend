@@ -162,7 +162,7 @@ router.delete('/:id', authenticateUser, requireAdmin, async (req: AuthRequest, r
         }
 
         // Delete from Supabase Auth (this will cascade to profiles due to FK)
-        const { error } = await supabase.auth.admin.deleteUser(id);
+        const { error } = await supabase.auth.admin.deleteUser(id as string);
 
         if (error) {
             throw error;

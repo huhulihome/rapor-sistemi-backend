@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Response } from 'express';
 import { supabase } from '../services/supabase.js';
-import { authenticateUser, requireAdmin, type AuthRequest } from '../middleware/auth.js';
+import { authenticateUser, type AuthRequest } from '../middleware/auth.js';
 import type { ApiResponse } from '../types/api.js';
 
 const router = Router();
