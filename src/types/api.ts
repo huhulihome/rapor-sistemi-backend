@@ -24,8 +24,8 @@ export interface CreateTaskRequest {
   due_date?: string;
   estimated_hours?: number;
   tags?: string[];
-  // New task type fields
-  task_type: 'routine' | 'one_time' | 'project';
+  // Optional task type fields (not required for basic task creation)
+  task_type?: 'routine' | 'one_time' | 'project';
   recurrence_pattern?: {
     type: 'daily' | 'weekly' | 'monthly';
     time?: string; // "09:00"

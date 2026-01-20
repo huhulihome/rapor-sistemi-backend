@@ -88,6 +88,42 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/tasks/completed - Get completed tasks (MUST be before /:id to avoid route matching issues)
+router.get('/completed', async (req: AuthRequest, res: Response) => {
+  try {
+    const { limit = '50', offset = '0' } = req.query;
+
+    let query = supabase
+      .from('tasks')
+      .select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(id, full_name, email)', { count: 'exact' })
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false });
+
+    // Non-admin users can only see their own completed tasks
+    if (req.user?.role !== 'admin') {
+      query = query.or(`assigned_to.eq.${req.user?.id},created_by.eq.${req.user?.id}`);
+    }
+
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
+    query = query.range(offsetNum, offsetNum + limitNum - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      res.status(400).json({ error: 'Database error', message: error.message } as ApiResponse<null>);
+      return;
+    }
+
+    res.json({ data, count, limit: limitNum, offset: offsetNum });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    } as ApiResponse<null>);
+  }
+});
+
 // GET /api/tasks/:id - Get single task by ID
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
@@ -419,42 +455,6 @@ router.delete('/:id', requireAdmin, async (req: AuthRequest, res: Response) => {
     res.json({
       message: 'Task deleted successfully',
     } as ApiResponse<null>);
-  } catch (error) {
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    } as ApiResponse<null>);
-  }
-});
-
-// GET /api/tasks/completed - Get completed tasks
-router.get('/completed', async (req: AuthRequest, res: Response) => {
-  try {
-    const { limit = '50', offset = '0' } = req.query;
-
-    let query = supabase
-      .from('tasks')
-      .select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(id, full_name, email)', { count: 'exact' })
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: false });
-
-    // Non-admin users can only see their own completed tasks
-    if (req.user?.role !== 'admin') {
-      query = query.or(`assigned_to.eq.${req.user?.id},created_by.eq.${req.user?.id}`);
-    }
-
-    const limitNum = parseInt(limit as string, 10);
-    const offsetNum = parseInt(offset as string, 10);
-    query = query.range(offsetNum, offsetNum + limitNum - 1);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      res.status(400).json({ error: 'Database error', message: error.message } as ApiResponse<null>);
-      return;
-    }
-
-    res.json({ data, count, limit: limitNum, offset: offsetNum });
   } catch (error) {
     res.status(500).json({
       error: 'Internal server error',

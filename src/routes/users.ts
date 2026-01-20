@@ -59,6 +59,7 @@ router.post('/create', authenticateUser, requireAdmin, async (req: AuthRequest, 
 
         if (authError) {
             logger.error('Failed to create user in auth', authError);
+            console.error('Supabase auth error details:', JSON.stringify(authError, null, 2));
 
             // Handle specific errors
             if (authError.message.includes('already registered')) {
@@ -71,7 +72,8 @@ router.post('/create', authenticateUser, requireAdmin, async (req: AuthRequest, 
 
             res.status(500).json({
                 error: 'Server Error',
-                message: 'Kullanıcı oluşturulurken bir hata oluştu',
+                message: 'Kullanıcı oluşturulurken bir hata oluştu: ' + authError.message,
+                details: authError.message,
             });
             return;
         }

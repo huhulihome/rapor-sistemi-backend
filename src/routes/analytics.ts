@@ -353,7 +353,7 @@ router.get('/employees-summary', requireAdmin, async (_req: AuthRequest, res: Re
           .from('tasks')
           .select('*', { count: 'exact', head: true })
           .eq('assigned_to', user.id)
-          .lt('deadline', now)
+          .lt('due_date', now)
           .neq('status', 'completed');
 
         return {
@@ -404,7 +404,7 @@ router.get('/recommendations', requireAdmin, async (_req: AuthRequest, res: Resp
           .from('tasks')
           .select('*', { count: 'exact', head: true })
           .eq('assigned_to', user.id)
-          .lt('deadline', new Date().toISOString())
+          .lt('due_date', new Date().toISOString())
           .neq('status', 'completed');
 
         return {
@@ -480,9 +480,9 @@ router.get('/late-tasks', requireAdmin, async (_req: AuthRequest, res: Response)
     const { data, error } = await supabase
       .from('tasks')
       .select('*, assigned_to_profile:profiles!tasks_assigned_to_fkey(id, full_name, email)')
-      .lt('deadline', now)
+      .lt('due_date', now)
       .neq('status', 'completed')
-      .order('deadline', { ascending: true });
+      .order('due_date', { ascending: true });
 
     if (error) {
       res.status(400).json({ error: 'Database error', message: error.message } as ApiResponse<null>);
