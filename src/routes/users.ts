@@ -147,6 +147,62 @@ router.get('/', authenticateUser, requireAdmin, async (_req: AuthRequest, res) =
 });
 
 /**
+ * PUT /api/users/:id/reset-password
+ * Reset a user's password (admin only)
+ */
+router.put('/:id/reset-password', authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+        const { id } = req.params;
+        const { password } = req.body;
+
+        // Cannot reset own password through this endpoint
+        if (id === req.user?.id) {
+            res.status(400).json({
+                error: 'Bad Request',
+                message: 'Kendi şifrenizi bu şekilde değiştiremezsiniz. Profil sayfasını kullanın.',
+            });
+            return;
+        }
+
+        // Validate password
+        if (!password || password.length < 6) {
+            res.status(400).json({
+                error: 'Bad Request',
+                message: 'Şifre en az 6 karakter olmalıdır',
+            });
+            return;
+        }
+
+        // Update password in Supabase Auth
+        const { error: authError } = await supabase.auth.admin.updateUserById(id, {
+            password: password,
+        });
+
+        if (authError) {
+            logger.error('Failed to reset user password', authError);
+            res.status(500).json({
+                error: 'Server Error',
+                message: 'Şifre sıfırlanırken bir hata oluştu: ' + authError.message,
+            });
+            return;
+        }
+
+        logger.info('User password reset', { userId: id, resetBy: req.user?.id });
+
+        res.json({
+            success: true,
+            message: 'Şifre başarıyla sıfırlandı',
+        });
+    } catch (error) {
+        logger.error('Error resetting user password', error as Error);
+        res.status(500).json({
+            error: 'Server Error',
+            message: 'Şifre sıfırlanırken bir hata oluştu',
+        });
+    }
+});
+
+/**
  * DELETE /api/users/:id
  * Delete a user (admin only)
  */
