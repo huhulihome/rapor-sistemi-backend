@@ -174,7 +174,7 @@ router.put('/:id/reset-password', authenticateUser, requireAdmin, async (req: Au
         }
 
         // Update password in Supabase Auth
-        const { error: authError } = await supabase.auth.admin.updateUserById(id, {
+        const { error: authError } = await supabase.auth.admin.updateUserById(id as string, {
             password: password,
         });
 
