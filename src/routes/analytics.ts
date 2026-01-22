@@ -340,14 +340,14 @@ router.get('/employees-summary', requireAdmin, async (_req: AuthRequest, res: Re
           .eq('status', 'completed')
           .gte('completed_at', weekStart.toISOString());
 
-        // Late tasks
+        // Late tasks (completed late)
         const { count: lateTasks } = await supabase
           .from('tasks')
           .select('*', { count: 'exact', head: true })
           .eq('assigned_to', user.id)
           .eq('late_completion', true);
 
-        // Overdue tasks
+        // Overdue tasks (not completed, past due date)
         const now = new Date().toISOString();
         const { count: overdueTasks } = await supabase
           .from('tasks')
@@ -356,12 +356,28 @@ router.get('/employees-summary', requireAdmin, async (_req: AuthRequest, res: Re
           .lt('due_date', now)
           .neq('status', 'completed');
 
+        // Calculate dynamic score
+        // Base: 100, -15 per overdue task, -5 per late completed task
+        // Bonus: +2 per task completed this week (max +20)
+        const overdueCount = overdueTasks || 0;
+        const lateCount = lateTasks || 0;
+        const completedCount = completedThisWeek || 0;
+
+        let calculatedScore = 100;
+        calculatedScore -= overdueCount * 15;  // Heavy penalty for overdue
+        calculatedScore -= lateCount * 5;      // Smaller penalty for late completion
+        calculatedScore += Math.min(completedCount * 2, 20);  // Bonus for productivity
+
+        // Clamp between 0 and 100
+        calculatedScore = Math.max(0, Math.min(100, calculatedScore));
+
         return {
           ...user,
+          score: calculatedScore,
           activeTasks: activeTasks || 0,
           completedThisWeek: completedThisWeek || 0,
-          lateTasks: lateTasks || 0,
-          overdueTasks: overdueTasks || 0,
+          lateTasks: lateCount,
+          overdueTasks: overdueCount,
         };
       })
     );
@@ -498,4 +514,203 @@ router.get('/late-tasks', requireAdmin, async (_req: AuthRequest, res: Response)
   }
 });
 
+// GET /api/analytics/tag-distribution - Get task distribution by tags (for pie chart)
+router.get('/tag-distribution', cacheMiddleware(5 * 60 * 1000), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const isAdmin = req.user?.role === 'admin';
+
+    let query = supabase.from('tasks').select('tags, status');
+
+    if (!isAdmin) {
+      query = query.or(`assigned_to.eq.${userId},created_by.eq.${userId}`);
+    }
+
+    const { data: tasks, error } = await query;
+
+    if (error) {
+      res.status(400).json({ error: 'Database error', message: error.message } as ApiResponse<null>);
+      return;
+    }
+
+    // Aggregate tags
+    const tagCounts: Record<string, { total: number; completed: number }> = {};
+    const noTagKey = 'Etiketsiz';
+
+    (tasks || []).forEach(task => {
+      const taskTags = task.tags && task.tags.length > 0 ? task.tags : [noTagKey];
+      const isCompleted = task.status === 'completed';
+
+      taskTags.forEach((tag: string) => {
+        if (!tagCounts[tag]) {
+          tagCounts[tag] = { total: 0, completed: 0 };
+        }
+        tagCounts[tag].total++;
+        if (isCompleted) {
+          tagCounts[tag].completed++;
+        }
+      });
+    });
+
+    // Convert to array and sort by total
+    const distribution = Object.entries(tagCounts)
+      .map(([tag, counts]) => ({
+        tag,
+        total: counts.total,
+        completed: counts.completed,
+        active: counts.total - counts.completed,
+        completionRate: counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    res.json({ data: distribution } as ApiResponse<typeof distribution>);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    } as ApiResponse<null>);
+  }
+});
+
+// GET /api/analytics/overview - Get comprehensive analytics overview (for auto-analytics page)
+router.get('/overview', cacheMiddleware(3 * 60 * 1000), async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const isAdmin = req.user?.role === 'admin';
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    // Build base query
+    let tasksQuery = supabase.from('tasks').select('*');
+    if (!isAdmin) {
+      tasksQuery = tasksQuery.or(`assigned_to.eq.${userId},created_by.eq.${userId}`);
+    }
+
+    const { data: tasks, error } = await tasksQuery;
+
+    if (error) {
+      res.status(400).json({ error: 'Database error', message: error.message } as ApiResponse<null>);
+      return;
+    }
+
+    const allTasks = tasks || [];
+    const nowIso = now.toISOString();
+
+    // Basic metrics
+    const totalTasks = allTasks.length;
+    const completedTasks = allTasks.filter(t => t.status === 'completed').length;
+    const activeTasks = allTasks.filter(t => t.status !== 'completed').length;
+    const overdueTasks = allTasks.filter(t => t.due_date && t.due_date < nowIso && t.status !== 'completed').length;
+    const recurringTasks = allTasks.filter(t => t.is_recurring).length;
+
+    // Weekly stats
+    const completedThisWeek = allTasks.filter(t =>
+      t.status === 'completed' &&
+      t.completed_at &&
+      new Date(t.completed_at) >= weekAgo
+    ).length;
+    const createdThisWeek = allTasks.filter(t =>
+      new Date(t.created_at) >= weekAgo
+    ).length;
+
+    // Tag analysis
+    const tagStats: Record<string, { total: number; overdue: number; avgHours: number }> = {};
+    allTasks.forEach(task => {
+      const taskTags = task.tags && task.tags.length > 0 ? task.tags : ['Etiketsiz'];
+      const isOverdue = task.due_date && task.due_date < nowIso && task.status !== 'completed';
+
+      taskTags.forEach((tag: string) => {
+        if (!tagStats[tag]) {
+          tagStats[tag] = { total: 0, overdue: 0, avgHours: 0 };
+        }
+        tagStats[tag].total++;
+        if (isOverdue) tagStats[tag].overdue++;
+        if (task.estimated_hours) {
+          tagStats[tag].avgHours = (tagStats[tag].avgHours + task.estimated_hours) / 2;
+        }
+      });
+    });
+
+    // Find problematic tags (high overdue rate)
+    const problematicTags = Object.entries(tagStats)
+      .filter(([, stats]) => stats.total >= 3 && (stats.overdue / stats.total) > 0.3)
+      .map(([tag, stats]) => ({
+        tag,
+        overdueRate: Math.round((stats.overdue / stats.total) * 100),
+        totalTasks: stats.total,
+        overdueTasks: stats.overdue,
+      }))
+      .sort((a, b) => b.overdueRate - a.overdueRate);
+
+    // Priority distribution
+    const priorityDistribution = {
+      critical: allTasks.filter(t => t.priority === 'critical').length,
+      high: allTasks.filter(t => t.priority === 'high').length,
+      medium: allTasks.filter(t => t.priority === 'medium').length,
+      low: allTasks.filter(t => t.priority === 'low').length,
+    };
+
+    // Category distribution (using tags as categories)
+    const tagDistribution = Object.entries(tagStats)
+      .map(([tag, stats]) => ({
+        name: tag,
+        value: stats.total,
+        overdue: stats.overdue,
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+
+    // Generate insights/recommendations
+    const insights: string[] = [];
+
+    if (overdueTasks > 0) {
+      insights.push(`⚠️ ${overdueTasks} adet geciken görev var, öncelikli olarak ele alınmalı.`);
+    }
+    if (problematicTags.length > 0) {
+      insights.push(`🔴 "${problematicTags[0].tag}" etiketindeki işlerin %${problematicTags[0].overdueRate}'si gecikiyor. Bu alana destek gerekebilir.`);
+    }
+    if (recurringTasks > totalTasks * 0.5) {
+      insights.push(`🔄 Görevlerin %${Math.round((recurringTasks / totalTasks) * 100)}'si rutin. Otomasyon düşünülebilir.`);
+    }
+    if (completedThisWeek > createdThisWeek) {
+      insights.push(`✅ Bu hafta ${completedThisWeek} görev tamamlandı, ${createdThisWeek} yeni görev oluşturuldu. Pozitif trend!`);
+    }
+    if (priorityDistribution.critical > 5) {
+      insights.push(`🚨 ${priorityDistribution.critical} kritik öncelikli görev var. Kaynak planlaması gerekebilir.`);
+    }
+
+    const overview = {
+      summary: {
+        totalTasks,
+        completedTasks,
+        activeTasks,
+        overdueTasks,
+        recurringTasks,
+        completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+        recurringRate: totalTasks > 0 ? Math.round((recurringTasks / totalTasks) * 100) : 0,
+      },
+      weekly: {
+        completedThisWeek,
+        createdThisWeek,
+        productivity: createdThisWeek > 0 ? Math.round((completedThisWeek / createdThisWeek) * 100) : 0,
+      },
+      distributions: {
+        byPriority: priorityDistribution,
+        byTag: tagDistribution,
+      },
+      problematicTags,
+      insights,
+    };
+
+    res.json({ data: overview } as ApiResponse<typeof overview>);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    } as ApiResponse<null>);
+  }
+});
+
 export default router;
+

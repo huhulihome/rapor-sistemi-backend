@@ -299,10 +299,21 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     const isReassignment = updateData.assigned_to &&
       updateData.assigned_to !== existingTask.assigned_to;
 
+    // Sanitize update data - convert empty strings to null for optional fields
+    const sanitizedData: Record<string, any> = {};
+    for (const [key, value] of Object.entries(updateData)) {
+      // Convert empty strings to null for timestamp/date/time fields
+      if (value === '' && ['due_date', 'start_time', 'end_time', 'recurrence_end_date'].includes(key)) {
+        sanitizedData[key] = null;
+      } else if (value !== undefined) {
+        sanitizedData[key] = value;
+      }
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .update({
-        ...updateData,
+        ...sanitizedData,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
