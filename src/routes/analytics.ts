@@ -7,6 +7,26 @@ import type { ApiResponse } from '../types/api.js';
 
 const router = Router();
 
+// Helper function to check if a task is overdue, considering end_time
+const isTaskOverdue = (task: any, now: Date = new Date()): boolean => {
+  if (!task.due_date || task.status === 'completed') return false;
+
+  // Parse the due_date
+  const dueDateStr = task.due_date.split('T')[0]; // Get just the date part (YYYY-MM-DD)
+
+  // If end_time is specified, combine it with due_date for accurate comparison
+  if (task.end_time) {
+    const deadlineStr = `${dueDateStr}T${task.end_time}`;
+    const deadline = new Date(deadlineStr);
+    return now > deadline;
+  }
+
+  // If no end_time, consider the task overdue after the due_date ends (end of day)
+  const dueDate = new Date(dueDateStr);
+  dueDate.setHours(23, 59, 59, 999);
+  return now > dueDate;
+};
+
 // All routes require authentication
 router.use(authenticateUser);
 
@@ -38,19 +58,18 @@ router.get('/dashboard', cacheMiddleware(5 * 60 * 1000), async (req: AuthRequest
     // Get pending issues
     const { count: pendingIssues } = await issuesQuery.eq('status', 'pending_assignment');
 
-    // Get overdue tasks
-    const now = new Date().toISOString();
-    const { count: overdueTasks } = await tasksQuery
-      .lt('due_date', now)
-      .neq('status', 'completed');
-
     // Get task completion rate
     const completionRate = totalTasks && totalTasks > 0
       ? Math.round((completedTasks || 0) / totalTasks * 100)
       : 0;
 
-    // Get tasks by priority
+    // Get tasks by priority - also used for overdue calculation
     const { data: tasksByPriority } = await tasksQuery;
+
+    // Calculate overdue using helper function that considers end_time
+    const now = new Date();
+    const overdueTasks = (tasksByPriority || []).filter(t => isTaskOverdue(t, now)).length;
+
     const priorityBreakdown = {
       low: tasksByPriority?.filter(t => t.priority === 'low').length || 0,
       medium: tasksByPriority?.filter(t => t.priority === 'medium').length || 0,
@@ -347,24 +366,24 @@ router.get('/employees-summary', requireAdmin, async (_req: AuthRequest, res: Re
           .eq('assigned_to', user.id)
           .eq('late_completion', true);
 
-        // Overdue tasks (not completed, past due date)
-        const now = new Date().toISOString();
-        const { count: overdueTasks } = await supabase
+        // Overdue tasks (not completed, past due date/time) - using helper for accurate calculation
+        const { data: userTasks } = await supabase
           .from('tasks')
-          .select('*', { count: 'exact', head: true })
+          .select('due_date, end_time, status')
           .eq('assigned_to', user.id)
-          .lt('due_date', now)
           .neq('status', 'completed');
+
+        const now = new Date();
+        const overdueTasksCount = (userTasks || []).filter(t => isTaskOverdue(t, now)).length;
 
         // Calculate dynamic score
         // Base: 100, -15 per overdue task, -5 per late completed task
         // Bonus: +2 per task completed this week (max +20)
-        const overdueCount = overdueTasks || 0;
         const lateCount = lateTasks || 0;
         const completedCount = completedThisWeek || 0;
 
         let calculatedScore = 100;
-        calculatedScore -= overdueCount * 15;  // Heavy penalty for overdue
+        calculatedScore -= overdueTasksCount * 15;  // Heavy penalty for overdue
         calculatedScore -= lateCount * 5;      // Smaller penalty for late completion
         calculatedScore += Math.min(completedCount * 2, 20);  // Bonus for productivity
 
@@ -377,7 +396,7 @@ router.get('/employees-summary', requireAdmin, async (_req: AuthRequest, res: Re
           activeTasks: activeTasks || 0,
           completedThisWeek: completedThisWeek || 0,
           lateTasks: lateCount,
-          overdueTasks: overdueCount,
+          overdueTasks: overdueTasksCount,
         };
       })
     );
@@ -416,17 +435,20 @@ router.get('/recommendations', requireAdmin, async (_req: AuthRequest, res: Resp
           .eq('assigned_to', user.id)
           .neq('status', 'completed');
 
-        const { count: overdueTasks } = await supabase
+        // Use helper for accurate overdue calculation with end_time
+        const { data: userTasks } = await supabase
           .from('tasks')
-          .select('*', { count: 'exact', head: true })
+          .select('due_date, end_time, status')
           .eq('assigned_to', user.id)
-          .lt('due_date', new Date().toISOString())
           .neq('status', 'completed');
+
+        const now = new Date();
+        const overdueTasksCount = (userTasks || []).filter(t => isTaskOverdue(t, now)).length;
 
         return {
           ...user,
           activeTasks: activeTasks || 0,
-          overdueTasks: overdueTasks || 0,
+          overdueTasks: overdueTasksCount,
         };
       })
     );
@@ -595,13 +617,12 @@ router.get('/overview', cacheMiddleware(3 * 60 * 1000), async (req: AuthRequest,
     }
 
     const allTasks = tasks || [];
-    const nowIso = now.toISOString();
 
     // Basic metrics
     const totalTasks = allTasks.length;
     const completedTasks = allTasks.filter(t => t.status === 'completed').length;
     const activeTasks = allTasks.filter(t => t.status !== 'completed').length;
-    const overdueTasks = allTasks.filter(t => t.due_date && t.due_date < nowIso && t.status !== 'completed').length;
+    const overdueTasks = allTasks.filter(t => isTaskOverdue(t, now)).length;
     const recurringTasks = allTasks.filter(t => t.is_recurring).length;
 
     // Weekly stats
@@ -618,14 +639,14 @@ router.get('/overview', cacheMiddleware(3 * 60 * 1000), async (req: AuthRequest,
     const tagStats: Record<string, { total: number; overdue: number; avgHours: number }> = {};
     allTasks.forEach(task => {
       const taskTags = task.tags && task.tags.length > 0 ? task.tags : ['Etiketsiz'];
-      const isOverdue = task.due_date && task.due_date < nowIso && task.status !== 'completed';
+      const taskIsOverdue = isTaskOverdue(task, now);
 
       taskTags.forEach((tag: string) => {
         if (!tagStats[tag]) {
           tagStats[tag] = { total: 0, overdue: 0, avgHours: 0 };
         }
         tagStats[tag].total++;
-        if (isOverdue) tagStats[tag].overdue++;
+        if (taskIsOverdue) tagStats[tag].overdue++;
         if (task.estimated_hours) {
           tagStats[tag].avgHours = (tagStats[tag].avgHours + task.estimated_hours) / 2;
         }
