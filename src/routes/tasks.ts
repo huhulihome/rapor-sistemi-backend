@@ -303,11 +303,21 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
     const sanitizedData: Record<string, any> = {};
     for (const [key, value] of Object.entries(updateData)) {
       // Convert empty strings to null for timestamp/date/time fields
-      if (value === '' && ['due_date', 'start_time', 'end_time', 'recurrence_end_date'].includes(key)) {
+      if (value === '' && ['due_date', 'start_time', 'end_time', 'recurrence_end_date', 'completed_at'].includes(key)) {
         sanitizedData[key] = null;
       } else if (value !== undefined) {
         sanitizedData[key] = value;
       }
+    }
+
+    // Automatically set completed_at when status changes to 'completed'
+    if (sanitizedData.status === 'completed' && existingTask.status !== 'completed') {
+      if (!sanitizedData.completed_at) {
+        sanitizedData.completed_at = new Date().toISOString();
+      }
+    } else if (sanitizedData.status && sanitizedData.status !== 'completed') {
+      // Clear completed_at if status is changed from completed to something else
+      sanitizedData.completed_at = null;
     }
 
     const { data, error } = await supabase

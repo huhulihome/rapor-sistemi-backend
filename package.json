@@ -31,7 +31,8 @@
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "helmet": "^8.1.0",
-    "nodemailer": "^7.0.12"
+    "nodemailer": "^7.0.12",
+    "pg": "^8.17.2"
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",

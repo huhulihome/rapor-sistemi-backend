@@ -106,7 +106,6 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
     try {
         const { id } = req.params;
-        const updateData = req.body;
 
         // Check ownership or admin
         const { data: existing } = await supabase
@@ -131,10 +130,25 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
             return;
         }
 
+        // Sanitize update data - only allow specific fields
+        const { title, description, deadline_date, reminder_date, priority, category, is_completed } = req.body;
+        const sanitizedData: Record<string, any> = {};
+
+        if (title !== undefined) sanitizedData.title = title;
+        if (description !== undefined) sanitizedData.description = description || null;
+        if (deadline_date !== undefined) sanitizedData.deadline_date = deadline_date;
+        if (reminder_date !== undefined) sanitizedData.reminder_date = reminder_date || null;
+        if (priority !== undefined) sanitizedData.priority = priority;
+        if (category !== undefined) sanitizedData.category = category || null;
+        if (is_completed !== undefined) {
+            sanitizedData.is_completed = is_completed;
+            sanitizedData.completed_at = is_completed ? new Date().toISOString() : null;
+        }
+
         const { data, error } = await supabase
             .from('deadlines')
             .update({
-                ...updateData,
+                ...sanitizedData,
                 updated_at: new Date().toISOString(),
             })
             .eq('id', id)
