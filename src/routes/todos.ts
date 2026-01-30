@@ -9,20 +9,25 @@ const router = Router();
 // All routes require authentication
 router.use(authenticateUser);
 
-// GET /api/todos - Get all todos for current user (admin sees all)
+// GET /api/todos - Get todos with optional user_id filter for admin
 router.get('/', async (req: AuthRequest, res: Response) => {
     try {
-        const { is_completed, limit = '50' } = req.query;
+        const { is_completed, limit = '50', user_id } = req.query;
 
         let query = supabase
             .from('todos')
-            .select('*')
+            .select('*, user:profiles!todos_user_id_fkey(id, full_name, email)')
             .order('created_at', { ascending: false });
 
-        // Admin sees all, others see only their own
-        if (req.user?.role !== 'admin') {
+        // If user_id parameter is provided and user is admin, filter by that user
+        if (user_id && req.user?.role === 'admin') {
+            query = query.eq('user_id', user_id);
+        }
+        // If not admin, always filter by own user_id
+        else if (req.user?.role !== 'admin') {
             query = query.eq('user_id', req.user?.id);
         }
+        // If admin and no user_id parameter, show all todos (existing behavior)
 
         if (is_completed !== undefined) {
             query = query.eq('is_completed', is_completed === 'true');

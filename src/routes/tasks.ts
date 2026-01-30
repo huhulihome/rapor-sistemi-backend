@@ -188,20 +188,39 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Only insert fields that exist in the tasks table
-    const insertData = {
+    // Build insert data with recurring fields
+    const insertData: Record<string, any> = {
       title: taskData.title,
       description: taskData.description || null,
       category: taskData.category,
       priority: taskData.priority,
       assigned_to: taskData.assigned_to || null,
       due_date: taskData.due_date || null,
+      start_time: taskData.start_time || null,
+      end_time: taskData.end_time || null,
       estimated_hours: taskData.estimated_hours || null,
       tags: taskData.tags || [],
       created_by: req.user?.id,
       status: 'not_started',
       progress_percentage: 0,
     };
+
+    // Add recurring fields if present
+    if (req.body.is_recurring !== undefined) {
+      insertData.is_recurring = req.body.is_recurring;
+    }
+    if (req.body.recurrence_pattern) {
+      insertData.recurrence_pattern = req.body.recurrence_pattern;
+    }
+    if (req.body.recurrence_interval !== undefined) {
+      insertData.recurrence_interval = req.body.recurrence_interval;
+    }
+    if (req.body.recurrence_end_date) {
+      insertData.recurrence_end_date = req.body.recurrence_end_date;
+    }
+    if (req.body.task_type) {
+      insertData.task_type = req.body.task_type;
+    }
 
     console.log('Task insert data:', JSON.stringify(insertData));
 
@@ -308,6 +327,23 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
       } else if (value !== undefined) {
         sanitizedData[key] = value;
       }
+    }
+
+    // Add recurring fields if present in request body
+    if (req.body.is_recurring !== undefined) {
+      sanitizedData.is_recurring = req.body.is_recurring;
+    }
+    if (req.body.recurrence_pattern !== undefined) {
+      sanitizedData.recurrence_pattern = req.body.recurrence_pattern;
+    }
+    if (req.body.recurrence_interval !== undefined) {
+      sanitizedData.recurrence_interval = req.body.recurrence_interval;
+    }
+    if (req.body.recurrence_end_date !== undefined) {
+      sanitizedData.recurrence_end_date = req.body.recurrence_end_date || null;
+    }
+    if (req.body.task_type !== undefined) {
+      sanitizedData.task_type = req.body.task_type;
     }
 
     // Automatically set completed_at when status changes to 'completed'
