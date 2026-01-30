@@ -22,6 +22,8 @@ export interface CreateTaskRequest {
   priority: 'low' | 'medium' | 'high' | 'critical';
   assigned_to?: string;
   due_date?: string;
+  start_time?: string;
+  end_time?: string;
   estimated_hours?: number;
   tags?: string[];
   // Optional task type fields (not required for basic task creation)
@@ -47,6 +49,8 @@ export interface UpdateTaskRequest {
   progress_percentage?: number;
   assigned_to?: string;
   due_date?: string;
+  start_time?: string;
+  end_time?: string;
   estimated_hours?: number;
   actual_hours?: number;
   tags?: string[];

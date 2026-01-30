@@ -168,7 +168,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 // POST /api/tasks - Create new task
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const taskData: CreateTaskRequest = req.body;
+    const taskData = req.body as CreateTaskRequest;
 
     // Validate required fields
     if (!taskData.title || !taskData.category || !taskData.priority) {
