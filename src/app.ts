@@ -62,18 +62,21 @@ app.use(compression({
 
 // CORS middleware with enhanced security
 app.use(cors({
-  origin: (origin, callback) => {
-    const allowedOrigins = config.cors.origin;
-
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins temporarily for debugging
+  // origin: (origin, callback) => {
+  //   const allowedOrigins = config.cors.origin;
+  //   // Allow requests with no origin (mobile apps, Postman, etc.)
+  //   if (!origin) return callback(null, true);
+  //   if (allowedOrigins.includes(origin)) {
+  //     callback(null, true);
+  //   } else {
+  //     // For Vercel preview deployments, we might need to be more lenient
+  //     // or use a regex pattern. For now allowing, but in prod use env vars.
+  //     // console.warn('Origin blocked by CORS:', origin);
+  //     // callback(new Error('Not allowed by CORS'));
+  //      callback(null, true); // Fallback allow for now
+  //   }
+  // },
   credentials: config.cors.credentials,
   methods: config.cors.methods,
   allowedHeaders: config.cors.allowedHeaders,
