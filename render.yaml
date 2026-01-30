@@ -3,7 +3,7 @@ services:
   - type: web
     name: rapor-sistemi-backend
     env: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     envVars:
       - key: PORT
