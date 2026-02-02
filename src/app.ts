@@ -15,6 +15,7 @@ import monitoringRoutes from './routes/monitoring.js';
 import usersRoutes from './routes/users.js';
 import deadlinesRoutes from './routes/deadlines.js';
 import todosRoutes from './routes/todos.js';
+import checklistRoutes from './routes/checklist.js';
 
 const app = express();
 
@@ -107,6 +108,7 @@ app.get('/health', (_req, res) => {
 
 // API routes
 app.use('/api/tasks', taskRoutes);
+app.use('/api/tasks', checklistRoutes); // Checklist routes under /api/tasks/:taskId/checklist
 app.use('/api/issues', issueRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
